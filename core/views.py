@@ -1,5 +1,5 @@
 from django.shortcuts import  render, get_object_or_404
-from rest_framework.generics import CreateAPIView, UpdateAPIView
+from rest_framework.generics import CreateAPIView, UpdateAPIView, GenericAPIView
 from rest_framework import status 
 from rest_framework.response import Response
 from rest_framework.views import APIView
@@ -144,27 +144,27 @@ class MasterListAPIView(APIView): #masterlarni filterlab olish uchun
         return Response(serializer.data)
 
     
+class MasterAvailabilityUpdateAPIView(GenericAPIView):
+        serializer_class = MasterAvailabilitySerializer
 
-class MasterAvailabilityPatchAPIView(APIView):
-    def patch(self, request, master_id):
-        master = get_object_or_404(Master, id=master_id)
+        def patch(self, request, master_id):
+            master = get_object_or_404(Master, id=master_id)
 
+            serializer = self.get_serializer(data=request.data)
+            serializer.is_valid(raise_exception=True)
 
-        serializer = MasterAvailabilitySerializer(data=request.data)
-        serializer.is_valid(raise_exception=True)
-        
-        date = serializer.validated_data['date']
+            date = serializer.validated_data['date']
 
-        availability, created = MasterAvailability.objects.update_or_create(
-            master=master,
-            date=date,
-            defaults={
-                'available_slots': serializer.validated_data['available_slots'],
-                'discount_percent': serializer.validated_data.get('discount_percent', 0),
-            }
-        )
+            availability, created = MasterAvailability.objects.update_or_create(
+                master=master,
+                date=date,
+                defaults={
+                    'available_slots': serializer.validated_data['available_slots'],
+                    'discount_percent': serializer.validated_data.get('discount_percent', 0),
+                }
+            )
 
-        return Response(
-            {'success': True},
-            status=status.HTTP_200_OK
+            return Response(
+                {'success': True},
+                status=status.HTTP_200_OK
         )

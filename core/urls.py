@@ -15,6 +15,6 @@ urlpatterns = [
     #Master URLs
     path('masters/', views.MasterCreateAPIView.as_view()),
     path('masters/list/', views.MasterListAPIView.as_view()),
-    path('masters/<int:master_id>/availability/', views.MasterAvailabilityPatchAPIView.as_view()),
+    path('masters/<int:master_id>/availability/', views.MasterAvailabilityUpdateAPIView.as_view()),
 
 ]
