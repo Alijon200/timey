@@ -40,10 +40,13 @@ INSTALLED_APPS = [
     'rest_framework',
     'core',
     'drf_spectacular',
+    'corsheaders',
     
 ]
 
+
 MIDDLEWARE = [
+    'corsheaders.middleware.CorsMiddleware',
     'django.middleware.security.SecurityMiddleware',
     'django.contrib.sessions.middleware.SessionMiddleware',
     'django.middleware.common.CommonMiddleware',
@@ -139,5 +142,9 @@ REST_FRAMEWORK = {
 
 
 STATIC_ROOT = BASE_DIR / "staticfiles"
+
+
+CORS_ALLOW_ALL_ORIGINS = False
+CORS_ALLOW_CREDENTIALS = True
 
 
