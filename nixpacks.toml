@@ -1,0 +1,9 @@
+[phases.install]
+cmds = [
+  "python -m pip install --upgrade pip",
+  "pip install -r requirements.txt",
+  "python -c \"import corsheaders; print('corsheaders OK')\""
+]
+
+[start]
+cmd = "gunicorn timey.wsgi:application --bind 0.0.0.0:$PORT"
