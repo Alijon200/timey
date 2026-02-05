@@ -57,3 +57,13 @@ def eskiz_send_sms(phone: str, text: str) -> dict:
         raise EskizError(f"Eskiz send error {r.status_code}: {r.text}")
 
     return r.json()
+
+@lru_cache(maxsize=1)
+def eskiz_get_token() -> str:
+    email = os.getenv("ESKIZ_EMAIL")
+    secret = os.getenv("ESKIZ_SECRET_KEY")
+
+    print("ESKIZ_EMAIL =", email)
+    print("ESKIZ_SECRET_KEY length =", len(secret or ""))
+
+    ...
