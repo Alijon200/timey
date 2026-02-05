@@ -39,7 +39,7 @@ def eskiz_get_token() -> str:
 def eskiz_send_sms(phone: str, text: str) -> dict:
     token = eskiz_get_token()
 
-    sender = os.getenv("ESKIZ_FROM", "4546")
+    sender = os.getenv("ESKIZ_SENDER", "4546")
     mobile_phone = phone.replace("+", "")
 
     r = requests.post(
