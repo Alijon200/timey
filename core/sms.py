@@ -7,35 +7,56 @@ ESKIZ_BASE = "https://notify.eskiz.uz/api"
 class EskizError(Exception):
     pass
 
+
+
+def _find_jwt(obj):
+    """JSON ichidan JWTga o‘xshagan tokenni topadi (aaa.bbb.ccc)."""
+    if isinstance(obj, dict):
+        for v in obj.values():
+            t = _find_jwt(v)
+            if t:
+                return t
+    elif isinstance(obj, list):
+        for it in obj:
+            t = _find_jwt(it)
+            if t:
+                return t
+    elif isinstance(obj, str):
+        s = obj.strip()
+        if s.count(".") == 2:  # JWT belgisi
+            return s
+    return None
+
+
 @lru_cache(maxsize=1)
 def eskiz_get_token() -> str:
-    """
-    Eskiz token olish.
-    Ba'zi akkauntlarda 'secret_key' bilan token beriladi.
-    """
+
     email = os.getenv("ESKIZ_EMAIL")
-    secret = os.getenv("ESKIZ_SECRET_KEY")
+    secret = os.getenv("ESKIZ_SECRET_KEY")  # Eskiz: password = secret key :contentReference[oaicite:1]{index=1}
 
     if not email or not secret:
-        raise EskizError("ESKIZ_EMAIL yoki ESKIZ_SECRET_KEY .env da yo‘q")
-
-    # ✅ Token olish (gateway)
+        raise EskizError("ESKIZ_EMAIL yoki ESKIZ_SECRET_KEY env'da yo‘q")
     r = requests.post(
         f"{ESKIZ_BASE}/auth/login",
-        data={"email": email, "password": secret},  # ko'pincha secret shu yerga beriladi
+        data={"email": email, "password": secret},
         timeout=20,
     )
-
-    # Debug uchun:
-    # print("TOKEN STATUS:", r.status_code)
-    # print("TOKEN TEXT:", r.text)
-
+    
     if r.status_code != 200:
-        raise EskizError(f"Eskiz token error {r.status_code}: {r.text}")
-    print("TOKEN STATUS:", r.status_code)
-    print("TOKEN JSON:", r.text)
+        raise EskizError(f"Eskiz login error {r.status_code}: {r.text}")
 
-    return r.json()["data"]["token"]
+    try:
+        payload = r.json()
+    except Exception:
+        raise EskizError(f"Eskiz login non-JSON: {r.text}")
+
+    token = _find_jwt(payload)
+    if not token:
+        # JWT topilmasa, demak response boshqa formatda yoki login token bermayapti
+        raise EskizError(f"JWT token topilmadi. Login response: {payload}")
+
+    return token
+
 
 
 
