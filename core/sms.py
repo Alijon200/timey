@@ -67,3 +67,7 @@ def eskiz_get_token() -> str:
     print("ESKIZ_SECRET_KEY length =", len(secret or ""))
 
     ...
+
+print("TOKEN STATUS:", r.status_code)
+print("TOKEN JSON:", r.text)
+
