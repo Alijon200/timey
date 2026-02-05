@@ -25,7 +25,8 @@ load_dotenv(BASE_DIR / ".env")
 # See https://docs.djangoproject.com/en/5.2/howto/deployment/checklist/
 
 # SECURITY WARNING: keep the secret key used in production secret!
-SECRET_KEY = 'django-insecure-w&1xo0u7xcrvh7&62p(=^q5@vf+-1%f7atwa(5$11x+$z%=)xz'
+SECRET_KEY = os.getenv("SECRET_KEY", "unsafe-dev-key")
+
 
 # SECURITY WARNING: don't run with debug turned on in production!
 DEBUG = True
@@ -174,7 +175,7 @@ CORS_ALLOWED_ORIGINS = [
 
 CSRF_TRUSTED_ORIGINS = [
     "http://localhost:5173",
-    "https://timey-production-ff41.up.railway.app",
+    "https://timey.up.railway.app",
 ]
 
 CORS_ALLOWED_ORIGIN_REGEXES = [
@@ -189,7 +190,7 @@ SPECTACULAR_SETTINGS = {
     "TITLE": "Timey API",
     "VERSION": "1.0.0",
     "SERVERS": [
-        {"url": "https://timey-production-ff41.up.railway.app", "description": "Railway"},
+        {"url": "https://timey.up.railway.app", "description": "Railway"},
         {"url": "http://127.0.0.1:8000", "description": "Local"},
     ],
 }
