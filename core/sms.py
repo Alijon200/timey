@@ -32,8 +32,12 @@ def eskiz_get_token() -> str:
 
     if r.status_code != 200:
         raise EskizError(f"Eskiz token error {r.status_code}: {r.text}")
+    print("TOKEN STATUS:", r.status_code)
+    print("TOKEN JSON:", r.text)
 
     return r.json()["data"]["token"]
+
+
 
 
 def eskiz_send_sms(phone: str, text: str) -> dict:
@@ -68,6 +72,4 @@ def eskiz_get_token() -> str:
 
     ...
 
-print("TOKEN STATUS:", r.status_code)
-print("TOKEN JSON:", r.text)
 
