@@ -9,11 +9,16 @@ https://docs.djangoproject.com/en/5.2/topics/settings/
 For the full list of settings and their values, see
 https://docs.djangoproject.com/en/5.2/ref/settings/
 """
-
 from pathlib import Path
+import os
+from dotenv import load_dotenv
 
-# Build paths inside the project like this: BASE_DIR / 'subdir'.
+# Build paths inside the project
 BASE_DIR = Path(__file__).resolve().parent.parent
+
+# .env faylni yuklash
+load_dotenv(BASE_DIR / ".env")
+
 
 
 # Quick-start development settings - unsuitable for production
@@ -27,7 +32,6 @@ DEBUG = True
 
 ALLOWED_HOSTS = ["*"]
 
-
 # Application definition
 
 INSTALLED_APPS = [
@@ -38,6 +42,7 @@ INSTALLED_APPS = [
     'django.contrib.messages',
     'django.contrib.staticfiles',
     'rest_framework',
+    'rest_framework_simplejwt', 
     'core',
     'drf_spectacular',
     'corsheaders',
@@ -80,15 +85,24 @@ WSGI_APPLICATION = 'timey.wsgi.application'
 # Database
 # https://docs.djangoproject.com/en/5.2/ref/settings/#databases
 
+# Database
 import os
+from pathlib import Path
 import dj_database_url
 
-DATABASES = {
-    "default": dj_database_url.config(
-        default=os.getenv("DATABASE_URL"),
-        conn_max_age=600,
-    )
-}
+DATABASE_URL = os.getenv("DATABASE_URL")
+
+if DATABASE_URL:
+    DATABASES = {
+        "default": dj_database_url.parse(DATABASE_URL, conn_max_age=600)
+    }
+else:
+    DATABASES = {
+        "default": {
+            "ENGINE": "django.db.backends.sqlite3",
+            "NAME": BASE_DIR / "db.sqlite3",
+        }
+    }
 
 
 
@@ -139,7 +153,13 @@ MEDIA_ROOT = BASE_DIR / 'media'
 
 REST_FRAMEWORK = {
     'DEFAULT_SCHEMA_CLASS': 'drf_spectacular.openapi.AutoSchema',
+    'DEFAULT_AUTHENTICATION_CLASSES': (
+        'rest_framework_simplejwt.authentication.JWTAuthentication',
+    ),
 }
+
+
+
 
 
 STATIC_ROOT = BASE_DIR / "staticfiles"
@@ -162,3 +182,14 @@ CORS_ALLOWED_ORIGIN_REGEXES = [
 ]
 
 print("### SETTINGS LOADED: CORS TEST 123 ###")
+
+TIME_ZONE = "Asia/Tashkent"
+
+SPECTACULAR_SETTINGS = {
+    "TITLE": "Timey API",
+    "VERSION": "1.0.0",
+    "SERVERS": [
+        {"url": "https://timey-production-ff41.up.railway.app", "description": "Railway"},
+        {"url": "http://127.0.0.1:8000", "description": "Local"},
+    ],
+}

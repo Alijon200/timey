@@ -18,6 +18,7 @@ def cancel_expired_bookings():
         expires_at__lt=now
     ).update(status=BookingStatus.CANCELLED)
 
+    
 
 
 
@@ -137,3 +138,24 @@ def get_today_availability(master):
         "next_available_time": free_slots[0],
         "discount_percent": availability.discount_percent
     }
+
+
+def get_next_available_time(master):
+    today = date.today()
+    availability = master.availabilities.filter(date=today).first()
+    if not availability:
+        return None
+    
+    available_slots = availability.available_slots or []
+
+    booked_slots = Booking.objects.filter(
+        master_id=master.id,
+        date=today,
+        status=BookingStatus.CONFIRMED
+        ).values_list('time', flat=True)
+    
+    free_slots = [
+        slot for slot in available_slots if slot not in booked_slots
+        ]
+    
+    return min(free_slots) if free_slots else None

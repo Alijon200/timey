@@ -2,6 +2,7 @@ from django.db import models
 from django.contrib.auth import get_user_model
 from django.utils import timezone
 from datetime import datetime, timedelta
+from django.conf import settings
 # Create your models here.
 
 User = get_user_model()
@@ -54,9 +55,12 @@ class Booking(models.Model):
     updated_at = models.DateTimeField(auto_now=True)
 
     def save(self, *args, **kwargs):
-        if not self.pk:  # faqat yaratishda
-            self.expires_at = timezone.now() + timedelta(minutes=15)
+        if not self.pk:
+            dt = datetime.combine(self.date, self.time)          # 2026-02-05 23:00
+            aware_dt = timezone.make_aware(dt)                   # timezone-aware
+            self.expires_at = aware_dt + timedelta(minutes=15)   # 23:15
         super().save(*args, **kwargs)
+
 
 
 
@@ -68,10 +72,19 @@ class Master(models.Model):
         ('inactive', 'Inactive'),
         ('blocked', 'Blocked'),
     )
+    SERVICE_TYPES = (
+        ('barber', 'Barber'),
+        ('beard', 'Beard'),
+        ('haircut', 'Haircut'),
+        ('planting', 'Planting'),
+
+    )
 
     full_name = models.CharField(max_length=255)
     phone = models.CharField(max_length=20, unique=True)
-    service_type = models.CharField(max_length=50)
+    service_type = models.CharField(max_length=20, choices=SERVICE_TYPES, default='barber')
+    service_types = models.JSONField(default=list, blank=True)  # Usta bir nechta xizmat ko‘rsatishi mumkin
+    price = models.PositiveIntegerField(default=0)  # xizmat narxi
     experience_years = models.PositiveIntegerField()
     rating = models.FloatField(default=0)
 
@@ -94,7 +107,7 @@ class MasterLocation(models.Model):
     master = models.OneToOneField(
         Master,
         on_delete=models.CASCADE,
-        related_name='location'
+        related_name='master_location'
     )
     lat = models.FloatField()  #latitude- kenglik
     lng = models.FloatField()  #longitude-uzunlik
@@ -121,3 +134,47 @@ class MasterAvailability(models.Model):
 
     def __str__(self):
         return f"{self.master.full_name} - {self.date}"
+
+
+
+
+
+
+
+class OTP(models.Model):
+    phone = models.CharField(max_length=20, db_index=True)
+    code = models.CharField(max_length=6)
+    created_at = models.DateTimeField(auto_now_add=True)
+    expires_at = models.DateTimeField()
+    resend_available_at = models.DateTimeField()
+    is_used = models.BooleanField(default=False)
+
+    def is_expired(self) -> bool:
+        return timezone.now() >= self.expires_at
+
+
+
+
+class TelegramProfile(models.Model):
+    user = models.OneToOneField(settings.AUTH_USER_MODEL, on_delete=models.CASCADE, related_name="telegram_profile")
+    telegram_id = models.BigIntegerField(unique=True)
+    language = models.CharField(max_length=10, default="uz", blank=True)
+
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    def __str__(self):
+        return f"tg:{self.telegram_id} -> user:{self.user_id}"
+
+
+class GuestProfile(models.Model):
+    user = models.OneToOneField(settings.AUTH_USER_MODEL, on_delete=models.CASCADE, related_name="guest_profile")
+
+    device_id = models.CharField(max_length=128, unique=True)
+    platform = models.CharField(max_length=20)  # android|ios|web
+    name = models.CharField(max_length=100, blank=True)
+    city = models.CharField(max_length=100, blank=True)
+
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    def __str__(self):
+        return f"guest:{self.device_id} -> user:{self.user_id}"

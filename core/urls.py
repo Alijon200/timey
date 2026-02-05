@@ -13,8 +13,19 @@ urlpatterns = [
 
 
     #Master URLs
-    path('masters/', views.MasterCreateAPIView.as_view()),
-    path('masters/list/', views.MasterListAPIView.as_view()),
-    path('masters/<int:master_id>/availability/', views.MasterAvailabilityUpdateAPIView.as_view()),
+    path('test/', views.TestAPIView.as_view(), name='test-api'),
+    path('masters/', views.MasterCreateAPIView.as_view(), name='master-create'),
+    path('masters/list/', views.MasterListAPIView.as_view(), name='master-list'),
+    path('masters/<int:master_id>/availability/', views.MasterAvailabilityPatchAPIView.as_view(), name='master-availability-patch'),
+    path('masters/<int:id>/', views.MasterDetailAPIView.as_view(), name='master-detail'),
+    path('masters/<int:master_id>/next-available-time/', views.MasterNextAvailableTimeAPIView.as_view() , name='master-next-available-time'),
 
+    #OTP URLs
+    path("api/auth/master/send-otp", views.MasterSendOtpAPIView.as_view()),
+    path("api/auth/master/verify-otp", views.MasterVerifyOtpAPIView.as_view()),
+
+
+    #Telegram URLs
+    path("api/auth/user/telegram", views.TelegramRegisterAPIView.as_view(), name="telegram-register"),
+    path("api/auth/guest/create", views.GuestUserCreateAPIView.as_view(), name="guest-create"),
 ]

@@ -1,3 +1,4 @@
+import re
 from rest_framework import serializers
 from .models import Booking, Master, MasterLocation, MasterAvailability
 from django.utils import timezone
@@ -136,6 +137,7 @@ class BookingCompleteSerializer(serializers.ModelSerializer):
 
 
 
+
 ########## MASTER BOOKING LIST SERIALIZER ##########
 
 
@@ -143,11 +145,20 @@ class BookingCompleteSerializer(serializers.ModelSerializer):
 class MasterLocationSerializer(serializers.ModelSerializer): #master location uchun
     class Meta:
         model = MasterLocation
-        fields = ('lat', 'lng', 'address', 'district', 'place_id', 'accuracy')
+        fields = (
+            'lat', 
+            'lng', 
+            'address', 
+            'district', 
+            'place_id', 
+            'accuracy'
+            )
 
 
 class MasterCreateSerializer(serializers.ModelSerializer): #master yaratish uchun
     master_location = MasterLocationSerializer(write_only=True)
+    created_at = serializers.DateTimeField(read_only=True,   format="%Y-%m-%d %H:%M")
+    id = serializers.SerializerMethodField()
 
     class Meta:
         model = Master
@@ -156,6 +167,8 @@ class MasterCreateSerializer(serializers.ModelSerializer): #master yaratish uchu
             'full_name',
             'phone',
             'service_type',
+            'service_types',
+            'price',
             'experience_years',
             'about',
             'avatar_url',
@@ -163,7 +176,11 @@ class MasterCreateSerializer(serializers.ModelSerializer): #master yaratish uchu
             'created_at',
             'master_location',
         )
+
         read_only_fields = ('id', 'status', 'created_at')
+    
+    def get_id(self, obj):
+        return f"{obj.id:05d}" 
 
     def create(self, validated_data):
         location_data = validated_data.pop('master_location')
@@ -174,11 +191,13 @@ class MasterCreateSerializer(serializers.ModelSerializer): #master yaratish uchu
     
 
 class MasterListSerializer(serializers.ModelSerializer): #masterlarni filterlab olish uchun
-    distance_km = serializers.SerializerMethodField()
+    master_location = MasterLocationSerializer(read_only=True)
     discount_percent = serializers.SerializerMethodField()
     is_available_today = serializers.SerializerMethodField()
     next_available_time = serializers.SerializerMethodField()
     rating = serializers.FloatField()
+    id = serializers.SerializerMethodField()
+
 
 
 
@@ -188,31 +207,16 @@ class MasterListSerializer(serializers.ModelSerializer): #masterlarni filterlab 
             'id',
             'full_name',
             'service_type',
+            'service_types',
+            'price',
             'rating',
-            'distance_km',
+            'master_location',
             'discount_percent',
             'is_available_today',
             'next_available_time',
             
         )
         
-    def get_distance_km(self, obj):
-        request = self.context.get('request')
-        if not request:
-            return None
-        
-        lat = request.query_params.get('lat')
-        lng = request.query_params.get('lng')
-        if not lat or not lng:
-            return None
-        #real distance hisoblash
-        return calculate_distance_km(
-            float(lat),
-            float(lng),
-            obj.location.lat,
-            obj.location.lng
-        )
-
     
     # master mavjudligi uchun
     def get_is_available_today(self, obj):
@@ -226,6 +230,9 @@ class MasterListSerializer(serializers.ModelSerializer): #masterlarni filterlab 
     def get_discount_percent(self, obj):
         from core.utils import get_today_availability
         return get_master_availability(obj)["discount_percent"]
+    
+    def get_id(self, obj):
+        return str(obj.id).zfill(5)  # ID ni 5 ta raqamga to'ldirish
 
 
 class MasterAvailabilitySerializer(serializers.ModelSerializer):
@@ -236,3 +243,86 @@ class MasterAvailabilitySerializer(serializers.ModelSerializer):
                 'available_slots',
                 'discount_percent',
             )
+
+
+class MasterDetailSerializer(serializers.ModelSerializer):
+    master_location = MasterLocationSerializer(read_only=True)
+    discount_percent = serializers.SerializerMethodField()
+    is_available_today = serializers.SerializerMethodField()
+    next_available_time = serializers.SerializerMethodField()
+    id = serializers.SerializerMethodField()
+
+    class Meta:
+        model = Master
+        fields = (
+            'id',
+            'full_name',
+            'phone',
+            'service_type',
+            'service_types',
+            'price',
+            'experience_years',
+            'rating',
+            'avatar_url',
+            'about',
+            'master_location',
+            'discount_percent',
+            'is_available_today',
+            'next_available_time',
+        )
+
+    def get_discount_percent(self, obj):
+        return get_master_availability(obj)["discount_percent"]
+
+    def get_is_available_today(self, obj):
+        return get_master_availability(obj)["is_available_today"]
+
+    def get_next_available_time(self, obj):
+        return get_master_availability(obj)["next_available_time"]
+
+    def get_id(self, obj):
+        return str(obj.id).zfill(5)
+
+
+
+
+
+
+
+
+UZ_PHONE_RE = re.compile(r"^\+998\d{9}$")
+
+class SendOtpSerializer(serializers.Serializer):
+    phone = serializers.CharField()
+
+    def validate_phone(self, value: str) -> str:
+        value = value.strip()
+        if not UZ_PHONE_RE.match(value):
+            raise serializers.ValidationError("Phone must be in format +998XXXXXXXXX")
+        return value
+
+
+class VerifyOtpSerializer(serializers.Serializer):
+    phone = serializers.CharField()
+    code = serializers.CharField(min_length=4, max_length=6)
+
+    def validate_phone(self, value: str) -> str:
+        value = value.strip()
+        if not UZ_PHONE_RE.match(value):
+            raise serializers.ValidationError("Phone must be in format +998XXXXXXXXX")
+        return value
+
+
+class TelegramRegisterSerializer(serializers.Serializer):
+    telegram_id = serializers.IntegerField()
+    first_name = serializers.CharField(max_length=100)
+    last_name = serializers.CharField(max_length=100, required=False, allow_blank=True)
+    language = serializers.CharField(max_length=10, required=False, allow_blank=True)
+
+
+
+class GuestCreateSerializer(serializers.Serializer):
+    name = serializers.CharField(max_length=100)
+    city = serializers.CharField(max_length=100)
+    device_id = serializers.CharField(max_length=128)
+    platform = serializers.ChoiceField(choices=["android", "ios", "web"])
