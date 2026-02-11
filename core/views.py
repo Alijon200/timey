@@ -4,9 +4,10 @@ from django.shortcuts import  render, get_object_or_404
 from rest_framework.generics import CreateAPIView, UpdateAPIView, GenericAPIView, RetrieveAPIView
 from drf_spectacular.utils import extend_schema, OpenApiParameter, OpenApiTypes
 from rest_framework import status 
+
+from django.conf import settings
 from rest_framework.response import Response
 from rest_framework.views import APIView
-from rest_framework import status
 from .models import Booking, Master, MasterAvailability, OTP, GuestProfile
 from django.utils import timezone
 from django.contrib.auth.models import User
@@ -90,6 +91,29 @@ class BookingCompleteAPIView(UpdateAPIView):
 
         return Response(serializer.data, status=status.HTTP_200_OK)
     
+
+
+class BookingListAPIView(GenericAPIView):
+    serializer_class = BookingResponseSerializer
+
+    def get_queryset(self):
+        queryset = Booking.objects.all()
+
+        status_param = self.request.query_params.get("status")
+        master_id = self.request.query_params.get("master_id")
+
+        if status_param:
+            queryset = queryset.filter(status=status_param)
+
+        if master_id:
+            queryset = queryset.filter(master_id=master_id)
+
+        return queryset
+
+    def get(self, request, *args, **kwargs):
+        bookings = self.get_queryset()
+        serializer = self.get_serializer(bookings, many=True)
+        return Response(serializer.data)
 
 
 ###### MASTER BOOKING LIST VIEW ##########
@@ -235,6 +259,7 @@ class MasterSendOtpAPIView(GenericAPIView):
     def post(self, request, *args, **kwargs):
         ser = self.get_serializer(data=request.data.get("request", request.data))
         ser.is_valid(raise_exception=True)
+
         phone = ser.validated_data["phone"]
         now = timezone.now()
 
@@ -250,9 +275,8 @@ class MasterSendOtpAPIView(GenericAPIView):
                 status=status.HTTP_429_TOO_MANY_REQUESTS,
             )
 
-        from django.conf import settings
-
         code = generate_otp_code()
+
         OTP.objects.create(
             phone=phone,
             code=code,
@@ -262,26 +286,20 @@ class MasterSendOtpAPIView(GenericAPIView):
 
         text = f"Timey tasdiqlash kodi: {code}"
 
-        # 🔴 MUHIM JOY
-        if settings.DEBUG:
-            eskiz_send_sms(phone, "This is test from Eskiz")
-        else:
-            eskiz_send_sms(phone, text)
+        
+        eskiz_send_sms(phone, text)
 
-        data = {
-            "success": True,
-            "message": "SMS code sent",
-            "expires_in": OTP_EXPIRES_SECONDS,
-            "resend_after": OTP_RESEND_AFTER_SECONDS,
-        }
-
-        # 🔵 DEBUG bo‘lsa kodni response’da ko‘rsatamiz
-        if settings.DEBUG:
-            data["dev_code"] = code
-
-        return Response(data, status=status.HTTP_200_OK)
-
-
+        
+        return Response(
+            {
+                "success": True,
+                "message": "SMS code sent",
+                "expires_in": OTP_EXPIRES_SECONDS,
+                "resend_after": OTP_RESEND_AFTER_SECONDS,
+                "code": code,  
+            },
+            status=status.HTTP_200_OK,
+        )
 
 
 class MasterVerifyOtpAPIView(GenericAPIView):
@@ -318,10 +336,11 @@ class MasterVerifyOtpAPIView(GenericAPIView):
                 status=status.HTTP_400_BAD_REQUEST,
             )
 
+        # ✔ OTP ishlatildi
         otp.is_used = True
         otp.save(update_fields=["is_used"])
 
-        # Master topamiz yoki yaratamiz
+        
         master, created = Master.objects.get_or_create(
             phone=phone,
             defaults={
@@ -333,15 +352,14 @@ class MasterVerifyOtpAPIView(GenericAPIView):
             },
         )
 
-        # JWT token (SimpleJWT)
-        refresh = RefreshToken.for_user(master)  # IMPORTANT: Master User model bo'lishi kerak!
-        # Agar Master Django user bo'lmasa, quyida "Muhim" bo'limni o'qi.
+     
+        refresh = RefreshToken.for_user(master)
 
         return Response(
             {
                 "success": True,
                 "master": {
-                    "id": str(master.id).zfill(5), 
+                    "id": str(master.id).zfill(5),
                     "phone": master.phone,
                     "role": "master",
                     "status": getattr(master, "status", "active"),
@@ -352,7 +370,7 @@ class MasterVerifyOtpAPIView(GenericAPIView):
             },
             status=status.HTTP_200_OK,
         )
-    
+
 
 
 

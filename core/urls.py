@@ -10,6 +10,7 @@ urlpatterns = [
     path('api/bookings/<int:id>/', views.BookingMasterActionView.as_view(), name='booking-master-action'),
     path('api/bookings/<int:id>/confirm', views.BookingClientConfirmAPIView.as_view(), name='booking-client-confirm'),
     path('api/bookings/<int:id>/complete', views.BookingCompleteAPIView.as_view(), name='booking-complete'),
+    path('api/bookings/list/', views.BookingListAPIView.as_view(), name='booking-list'),
 
 
     #Master URLs

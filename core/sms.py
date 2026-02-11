@@ -1,6 +1,5 @@
 import os
 import requests
-from functools import lru_cache
 
 ESKIZ_BASE = "https://notify.eskiz.uz/api"
 
@@ -9,39 +8,12 @@ class EskizError(Exception):
     pass
 
 
-def mask(s: str, keep: int = 6) -> str:
-    """Tokenni logda yashirib ko'rsatish uchun."""
-    if not s:
-        return ""
-    s = s.strip()
-    if len(s) <= keep * 2:
-        return "*" * len(s)
-    return s[:keep] + "*" * (len(s) - keep * 2) + s[-keep:]
-
-
-def _env(name: str, default: str | None = None) -> str | None:
-    """Env o'qish (bo'sh string bo'lsa ham None qiladi)."""
-    v = os.getenv(name, default)
-    if v is None:
-        return None
-    v = v.strip()
-    return v if v else None
-
-
-@lru_cache(maxsize=1)
 def eskiz_get_token() -> str:
-    """
-    Eskiz'dan token olish.
-    ESKIZ_SECRET_KEY — Eskiz kabinetdagi API password/secret (akkaunt paroli bo'lishi ham mumkin).
-    """
-    email = _env("ESKIZ_EMAIL")
-    secret = _env("ESKIZ_SECRET_KEY")
-
-    print("ESKIZ_EMAIL =", email)
-    print("ESKIZ_SECRET_KEY length =", len(secret or ""))
+    email = os.getenv("ESKIZ_EMAIL")
+    secret = os.getenv("ESKIZ_SECRET_KEY")
 
     if not email or not secret:
-        raise EskizError("ESKIZ_EMAIL yoki ESKIZ_SECRET_KEY env'da yo‘q")
+        raise EskizError("ESKIZ_EMAIL yoki ESKIZ_SECRET_KEY yo‘q")
 
     r = requests.post(
         f"{ESKIZ_BASE}/auth/login",
@@ -49,64 +21,57 @@ def eskiz_get_token() -> str:
         timeout=20,
     )
 
-    print("LOGIN STATUS:", r.status_code)
-    print("LOGIN TEXT:", r.text[:500])
-
-    if r.status_code != 200:
-        raise EskizError(f"Eskiz login error {r.status_code}: {r.text}")
-
     try:
         data = r.json()
     except Exception:
-        raise EskizError(f"Eskiz login JSON emas: {r.text}")
+        raise EskizError(f"Eskiz login json emas. status={r.status_code}, text={r.text[:200]}")
 
-    # Eskiz ko'pincha shu formatda qaytaradi: {"data":{"token":"..."}}
-    token = (
-        (data.get("data") or {}).get("token")
-        or (data.get("data") or {}).get("access_token")
-        or data.get("token")
-        or data.get("access_token")
-    )
-
-    if not token:
-        raise EskizError(f"Token topilmadi. Response: {data}")
-
-    token = str(token).strip()
-    print("TOKEN len:", len(token), "dots:", token.count("."), "masked:", mask(token))
-
-    # JWT bo'lishi kerak: aaa.bbb.ccc
-    if token.count(".") != 2:
-        raise EskizError(
-            f"Eskiz token JWT emas (dots={token.count('.')}). "
-            f"Token masked: {mask(token)}"
-        )
+    # ✅ Eskiz login ba'zan "status": "success" bermaydi.
+    # Biz token bor-yo‘qligini tekshiramiz.
+    token = (data.get("data") or {}).get("token")
+    if r.status_code != 200 or not token:
+        raise EskizError(f"Eskiz login error: status={r.status_code}, data={data}")
 
     return token
 
 
 def eskiz_send_sms(phone: str, text: str) -> dict:
-    token = eskiz_get_token()
+    """
+    Hech qachon serverni yiqitmaydi:
+    - sent=True/False qaytaradi
+    - error/info qaytaradi
+    """
+    from django.conf import settings
 
-    sender = _env("ESKIZ_SENDER") or "4546"
-    mobile_phone = (phone or "").replace("+", "").strip()
-
-    if not mobile_phone.isdigit():
-        raise EskizError(f"Telefon formati noto‘g‘ri: {phone}")
-
-    r = requests.post(
-        f"{ESKIZ_BASE}/message/sms/send",
-        headers={"Authorization": f"Bearer {token}"},
-        data={"mobile_phone": mobile_phone, "message": text, "from": sender},
-        timeout=20,
-    )
-
-    print("SEND STATUS:", r.status_code)
-    print("SEND TEXT:", r.text[:500])
-
-    if r.status_code != 200:
-        raise EskizError(f"Eskiz send error {r.status_code}: {r.text}")
+    # DEV rejimda SMS yubormaymiz
+    if getattr(settings, "DEV_OTP_MODE", False):
+        return {"sent": False, "mode": "dev", "message": "DEV_OTP_MODE=1, SMS not sent"}
 
     try:
-        return r.json()
-    except Exception:
-        return {"raw": r.text}
+        token = eskiz_get_token()
+
+        headers = {"Authorization": f"Bearer {token}"}
+        payload = {
+            "mobile_phone": phone.replace("+", ""),
+            "message": text,
+            "from": os.getenv("ESKIZ_FROM", "4546"),
+        }
+
+        r = requests.post(
+            f"{ESKIZ_BASE}/message/sms/send",
+            data=payload,
+            headers=headers,
+            timeout=20,
+        )
+
+        try:
+            data = r.json()
+        except Exception:
+            data = {"raw_text": r.text[:500]}
+
+        ok = (r.status_code == 200) and (data.get("status") == "success")
+        return {"sent": ok, "status_code": r.status_code, "data": data}
+
+    except Exception as e:
+        # ✅ Eng muhim joy: exception tashlamaymiz
+        return {"sent": False, "error": str(e)}

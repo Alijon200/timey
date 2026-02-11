@@ -49,7 +49,7 @@ class BookingResponseSerializer(serializers.ModelSerializer):
 
     class Meta:
         model = Booking
-        fields = ['booking_id', 'status', 'expires_at']
+        fields = ['booking_id', 'status', 'expires_at', 'master_id', 'user_id']
     
     
 
@@ -157,9 +157,7 @@ class MasterLocationSerializer(serializers.ModelSerializer): #master location uc
 
 class MasterCreateSerializer(serializers.ModelSerializer): #master yaratish uchun
     master_location = MasterLocationSerializer(write_only=True)
-    created_at = serializers.DateTimeField(read_only=True,   format="%Y-%m-%d %H:%M")
-    id = serializers.SerializerMethodField()
-
+    created_at = serializers.DateTimeField(read_only=True, format="%Y-%m-%d %H:%M")
     class Meta:
         model = Master
         fields = (
@@ -179,8 +177,26 @@ class MasterCreateSerializer(serializers.ModelSerializer): #master yaratish uchu
 
         read_only_fields = ('id', 'status', 'created_at')
     
-    def get_id(self, obj):
-        return f"{obj.id:05d}" 
+    def validate_service_types(self, value):
+        if not isinstance(value, list):
+            raise serializers.ValidationError("service_types list bo'lishi kerak.")
+        
+        for idx, item in enumerate(value):
+            if not isinstance(item, dict):
+                raise serializers.ValidationError(f"service_types[{idx}] obyekt bo'lishi kerak.")
+            if "name" not in item or not item["name"]:
+                raise serializers.ValidationError(f"service_types[{idx}].name kerak.")
+            if "service_price" not in item:
+                raise serializers.ValidationError(f"service_types[{idx}].service_price kerak.")
+            price = item["service_price"]
+            if not isinstance(price, int) or price < 0:
+                raise serializers.ValidationError(
+                    f"service_types[{idx}].service_price musbat son bo'lishi kerak."
+                    )
+        return value
+
+
+
 
     def create(self, validated_data):
         location_data = validated_data.pop('master_location')
@@ -207,7 +223,6 @@ class MasterListSerializer(serializers.ModelSerializer): #masterlarni filterlab 
             'id',
             'full_name',
             'service_type',
-            'service_types',
             'price',
             'rating',
             'master_location',
@@ -244,8 +259,7 @@ class MasterAvailabilitySerializer(serializers.ModelSerializer):
                 'discount_percent',
             )
 
-
-class MasterDetailSerializer(serializers.ModelSerializer):
+class MasterDetailSerializer(serializers.ModelSerializer): #master detail uchun
     master_location = MasterLocationSerializer(read_only=True)
     discount_percent = serializers.SerializerMethodField()
     is_available_today = serializers.SerializerMethodField()
@@ -282,6 +296,7 @@ class MasterDetailSerializer(serializers.ModelSerializer):
 
     def get_id(self, obj):
         return str(obj.id).zfill(5)
+
 
 
 
