@@ -7,7 +7,7 @@ from rest_framework import status
 from rest_framework.response import Response
 from rest_framework.views import APIView
 from rest_framework import status
-from .models import Booking, Master, MasterAvailability, OTP, TelegramProfile, GuestProfile
+from .models import Booking, Master, MasterAvailability, OTP, GuestProfile
 from django.utils import timezone
 from django.contrib.auth.models import User
 from rest_framework_simplejwt.tokens import RefreshToken
@@ -17,7 +17,7 @@ from datetime import timedelta
 from .serializers import(BookingCompleteSerializer, BookingCreateSerializer, BookingResponseSerializer, 
                         BookingMasterActionSerializer, BookingClientConfirmSerializer,  MasterCreateSerializer,
                         MasterListSerializer, MasterAvailabilitySerializer, SendOtpSerializer, VerifyOtpSerializer,
-                        TelegramRegisterSerializer, GuestCreateSerializer, MasterDetailSerializer)
+                        GuestCreateSerializer, MasterDetailSerializer)
 from core.utils import cancel_expired_bookings, get_today_availability, get_next_available_time
 
 
@@ -357,62 +357,6 @@ class MasterVerifyOtpAPIView(GenericAPIView):
 
 
 ### USER MODEL AUTHORIZED TELEGRAM PROFILE VIEW ###
-
-
-class TelegramRegisterAPIView(GenericAPIView):
-    serializer_class = TelegramRegisterSerializer
-    authentication_classes = []
-    permission_classes = []
-
-    def post(self, request, *args, **kwargs):
-        ser = self.get_serializer(data=request.data.get("request", request.data))
-        ser.is_valid(raise_exception=True)
-        data = ser.validated_data
-
-        telegram_id = data["telegram_id"]
-        first_name = data["first_name"]
-        last_name = data.get("last_name", "")
-        language = (data.get("language") or "uz").strip() or "uz"
-
-        profile = TelegramProfile.objects.filter(telegram_id=telegram_id).select_related("user").first()
-
-        if not profile:
-            username = f"tg_{telegram_id}"[:150]
-            user = User.objects.create(username=username,first_name=first_name,last_name=last_name)
-            user.set_unusable_password()
-            user.save()
-
-            profile = TelegramProfile.objects.create(user=user,telegram_id=telegram_id,language=language)
-        else:
-            user = profile.user
-            user.first_name = first_name
-            user.last_name = last_name
-            user.save(update_fields=["first_name", "last_name"])
-
-            profile.language = language
-            profile.save(update_fields=["language"])
-
-        refresh = RefreshToken.for_user(profile.user)
-
-        return Response(
-            {
-                "success": True,
-                "role": "user",
-                "user": {
-                    "id": profile.user.id,
-                    "telegram_id": profile.telegram_id,
-                    "first_name": profile.user.first_name,
-                },
-                "access_token": str(refresh.access_token),
-                "refresh_token": str(refresh),
-                "expires_in": ACCESS_EXPIRES_SECONDS,
-            },
-            status=status.HTTP_200_OK,
-        )
-
-
-
-
 
 
 class GuestUserCreateAPIView(GenericAPIView):

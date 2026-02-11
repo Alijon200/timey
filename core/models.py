@@ -153,19 +153,6 @@ class OTP(models.Model):
         return timezone.now() >= self.expires_at
 
 
-
-
-class TelegramProfile(models.Model):
-    user = models.OneToOneField(settings.AUTH_USER_MODEL, on_delete=models.CASCADE, related_name="telegram_profile")
-    telegram_id = models.BigIntegerField(unique=True)
-    language = models.CharField(max_length=10, default="uz", blank=True)
-
-    created_at = models.DateTimeField(auto_now_add=True)
-
-    def __str__(self):
-        return f"tg:{self.telegram_id} -> user:{self.user_id}"
-
-
 class GuestProfile(models.Model):
     user = models.OneToOneField(settings.AUTH_USER_MODEL, on_delete=models.CASCADE, related_name="guest_profile")
 

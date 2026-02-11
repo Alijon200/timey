@@ -313,14 +313,6 @@ class VerifyOtpSerializer(serializers.Serializer):
         return value
 
 
-class TelegramRegisterSerializer(serializers.Serializer):
-    telegram_id = serializers.IntegerField()
-    first_name = serializers.CharField(max_length=100)
-    last_name = serializers.CharField(max_length=100, required=False, allow_blank=True)
-    language = serializers.CharField(max_length=10, required=False, allow_blank=True)
-
-
-
 class GuestCreateSerializer(serializers.Serializer):
     name = serializers.CharField(max_length=100)
     city = serializers.CharField(max_length=100)

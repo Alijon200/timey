@@ -1,6 +1,6 @@
 from django.contrib import admin
 
-from core.models import OTP, Booking, GuestProfile, Master, MasterAvailability, MasterLocation, TelegramProfile, User
+from core.models import OTP, Booking, GuestProfile, Master, MasterAvailability, MasterLocation, User
 
 # Register your models here.
 
@@ -49,8 +49,3 @@ class GuestProfileAdmin(admin.ModelAdmin):
     ordering = ('-created_at',)
 
 
-@admin.register(TelegramProfile)
-class TelegramProfileAdmin(admin.ModelAdmin):
-    list_display = ('id', 'user_id', 'telegram_id', 'created_at')
-    search_fields = ('user_id', 'telegram_id')
-    ordering = ('-created_at',)
