@@ -6,7 +6,8 @@ from datetime import datetime
 from core.utils import calculate_distance_km, get_master_availability
 
 
-
+class EmptySerializer(serializers.Serializer):
+    pass
 
 class BookingCreateSerializer(serializers.ModelSerializer):
     date = serializers.DateField(format="%Y-%m-%d", input_formats=["%Y-%m-%d"])

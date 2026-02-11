@@ -16,7 +16,7 @@ from django.db import transaction
 import random
 from datetime import timedelta
 from .serializers import(BookingCompleteSerializer, BookingCreateSerializer, BookingResponseSerializer, 
-                        BookingMasterActionSerializer, BookingClientConfirmSerializer,  MasterCreateSerializer,
+                        BookingMasterActionSerializer, BookingClientConfirmSerializer, EmptySerializer,  MasterCreateSerializer,
                         MasterListSerializer, MasterAvailabilitySerializer, SendOtpSerializer, VerifyOtpSerializer,
                         GuestCreateSerializer, MasterDetailSerializer)
 from core.utils import cancel_expired_bookings, get_today_availability, get_next_available_time
@@ -118,6 +118,7 @@ class BookingListAPIView(GenericAPIView):
 
 ###### MASTER BOOKING LIST VIEW ##########
 class TestAPIView(APIView):
+    serializer_class = EmptySerializer
     def get(self, request):
         return Response({
             "message": "Timey backend is working fine!"
@@ -139,7 +140,8 @@ class MasterCreateAPIView(CreateAPIView): # master yaratish uchun
         OpenApiParameter("sort", OpenApiTypes.STR, OpenApiParameter.QUERY, description="rating bo‘yicha tartib"),
     ]
 )
-class MasterListAPIView(APIView): #masterlarni filterlab olish uchun
+class MasterListAPIView(APIView):
+    serializer_class = EmptySerializer #masterlarni filterlab olish uchun
     def get(self, request):
         masters = Master.objects.all()
 
