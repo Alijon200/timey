@@ -289,10 +289,10 @@ class MasterDetailSerializer(serializers.ModelSerializer): #master detail uchun
     def get_discount_percent(self, obj):
         return get_master_availability(obj)["discount_percent"]
 
-    def get_is_available_today(self, obj):
+    def get_is_available_today(self, obj)-> bool:
         return get_master_availability(obj)["is_available_today"]
 
-    def get_next_available_time(self, obj):
+    def get_next_available_time(self, obj) -> str | None:
         return get_master_availability(obj)["next_available_time"]
 
     def get_id(self, obj):
