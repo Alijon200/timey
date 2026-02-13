@@ -4,7 +4,9 @@ from django.shortcuts import  render, get_object_or_404
 from rest_framework.generics import CreateAPIView, UpdateAPIView, GenericAPIView, RetrieveAPIView
 from drf_spectacular.utils import extend_schema, OpenApiParameter, OpenApiTypes
 from rest_framework import status 
-
+from rest_framework.permissions import IsAuthenticated, BasePermission, AllowAny
+from rest_framework_simplejwt.authentication import JWTAuthentication
+from rest_framework.exceptions import NotFound, ValidationError
 from django.conf import settings
 from rest_framework.response import Response
 from rest_framework.views import APIView
@@ -18,7 +20,7 @@ from datetime import timedelta
 from .serializers import(BookingCompleteSerializer, BookingCreateSerializer, BookingResponseSerializer, 
                         BookingMasterActionSerializer, BookingClientConfirmSerializer, EmptySerializer,  MasterCreateSerializer,
                         MasterListSerializer, MasterAvailabilitySerializer, SendOtpSerializer, VerifyOtpSerializer,
-                        GuestCreateSerializer, MasterDetailSerializer)
+                        GuestCreateSerializer, MasterDetailSerializer, GuestUpdateSerializer)
 from core.utils import cancel_expired_bookings, get_today_availability, get_next_available_time
 
 
@@ -246,7 +248,7 @@ from .sms import eskiz_send_sms
 
 OTP_EXPIRES_SECONDS = 120
 OTP_RESEND_AFTER_SECONDS = 60
-ACCESS_EXPIRES_SECONDS = 900  # 15 minut (clientga ko'rsatish uchun)
+ACCESS_EXPIRES_SECONDS = 3600  # 15 minut (clientga ko'rsatish uchun)
 
 
 def generate_otp_code() -> str:
@@ -385,37 +387,117 @@ class GuestUserCreateAPIView(GenericAPIView):
     permission_classes = []
 
     def post(self, request, *args, **kwargs):
-        ser = self.get_serializer(data=request.data.get("request", request.data))
+        payload = request.data.get("request", request.data)
+        ser = self.get_serializer(data=payload)
+        ser.is_valid(raise_exception=True)
+
+        telegram_id = ser.validated_data.get("telegram_id")
+        last_name = ser.validated_data.get("last_name", "")
+        first_name = ser.validated_data.get("first_name", "")
+        username = ser.validated_data.get("username", "")
+        phone = ser.validated_data.get("phone")
+
+        # username ni "doim string" qilib olish
+        suffix = telegram_id or phone or random.randint(1000, 9999)
+        uname = f"guest_{suffix}"
+
+        try:
+            with transaction.atomic():
+                user = User.objects.create(username=uname)
+
+                guest_profile = GuestProfile.objects.create(
+                    user=user,
+                    telegram_id=telegram_id,   # endi int bo‘ladi (serializer kafolatlaydi)
+                    last_name=last_name,
+                    first_name=first_name,
+                    username=username,
+                    phone=phone
+                )
+        except IntegrityError:
+            # masalan username unique bo‘lsa urilib qolishi mumkin
+            raise ValidationError({"telegram_id": "Bu telegram_id allaqachon mavjud."})
+
+        refresh = RefreshToken.for_user(user)
+
+        return Response({
+            "success": True,
+            "guest": {
+                "id": guest_profile.id,
+                "telegram_id": guest_profile.telegram_id,
+                "last_name": guest_profile.last_name,
+                "first_name": guest_profile.first_name,
+                "username": guest_profile.username,
+                "phone": guest_profile.phone
+            },
+            "access_token": str(refresh.access_token),
+            "refresh_token": str(refresh),
+            "expires_in": ACCESS_EXPIRES_SECONDS,
+        }, status=status.HTTP_201_CREATED)
+
+
+
+
+
+class IsGuestUser(BasePermission):
+    message = "Faqat guest user update qila oladi."
+
+    def has_permission(self, request, view):
+        user = request.user
+        return bool(user and user.is_authenticated and hasattr(user, "guest_profile"))
+
+
+class GuestUserUpdateAPIView(GenericAPIView):
+    serializer_class = GuestUpdateSerializer
+
+    def get_authenticators(self):
+        return [JWTAuthentication()]
+
+    def get_permissions(self):
+        return [IsAuthenticated(), IsGuestUser()]
+
+    def get_object(self):
+        try:
+            return self.request.user.guest_profile
+        except Exception:
+            raise NotFound("Guest profile not found")
+
+    def put(self, request, *args, **kwargs):
+        return self._update(request, partial=False)
+
+    def patch(self, request, *args, **kwargs):
+        return self._update(request, partial=True)
+
+    def _update(self, request, partial: bool):
+        guest_profile = self.get_object()
+        payload = request.data.get("request", request.data)
+
+        # ✅ MUHIM: instance=guest_profile berilyapti
+        ser = self.get_serializer(
+            instance=guest_profile,
+            data=payload,
+            partial=partial,
+            context={"request": request}
+        )
         ser.is_valid(raise_exception=True)
         data = ser.validated_data
 
-        device_id = data["device_id"]
+        for field in ("telegram_id", "last_name", "first_name", "username", "phone"):
+            if field in data:
+                setattr(guest_profile, field, data[field])
 
-        # device_id bo‘yicha topamiz
-        profile = GuestProfile.objects.filter(device_id=device_id).select_related("user").first()
+        try:
+            guest_profile.save()
+        except IntegrityError:
+            raise ValidationError({"detail": "Update conflict (unique) bo‘lishi mumkin."})
 
-        if not profile:
-            # yangi guest user
-            username = f"guest_{device_id}"[:150]
-            user = User.objects.create(username=username)
-            user.set_unusable_password()
-            user.save()
-
-            profile = GuestProfile.objects.create(user=user,device_id=device_id,platform=data["platform"],name=data["name"],city=data["city"])
-        else:
-            # mavjud guestni update
-            profile.platform = data["platform"]
-            profile.name = data["name"]
-            profile.city = data["city"]
-            profile.save(update_fields=["platform", "name", "city"])
-
-        refresh = RefreshToken.for_user(profile.user)
-
-        return Response(
-            {
-                "guest_user_id": f"guest_{profile.id}",
-                "access_token": str(refresh.access_token),
-                "role": "guest",
-            },
-            status=status.HTTP_200_OK,
-        )
+        return Response({
+            "success": True,
+            "guest": {
+                "id": guest_profile.id,
+                "telegram_id": guest_profile.telegram_id,
+                "last_name": guest_profile.last_name,
+                "first_name": guest_profile.first_name,
+                "username": guest_profile.username,
+                "phone": guest_profile.phone
+            }
+        }, status=status.HTTP_200_OK)

@@ -28,4 +28,5 @@ urlpatterns = [
 
     #Telegram URLs
     path("api/auth/guest/create", views.GuestUserCreateAPIView.as_view(), name="guest-create"),
+    path("api/auth/guest/update", views.GuestUserUpdateAPIView.as_view(), name="guest-update"),
 ]

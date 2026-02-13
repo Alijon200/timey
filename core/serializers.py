@@ -1,6 +1,6 @@
 import re
 from rest_framework import serializers
-from .models import Booking, Master, MasterLocation, MasterAvailability
+from .models import Booking, Master, MasterLocation, MasterAvailability, GuestProfile
 from django.utils import timezone
 from datetime import datetime
 from core.utils import calculate_distance_km, get_master_availability
@@ -329,8 +329,66 @@ class VerifyOtpSerializer(serializers.Serializer):
         return value
 
 
+
+
 class GuestCreateSerializer(serializers.Serializer):
-    name = serializers.CharField(max_length=100)
-    city = serializers.CharField(max_length=100)
-    device_id = serializers.CharField(max_length=128)
-    platform = serializers.ChoiceField(choices=["android", "ios", "web"])
+    telegram_id = serializers.IntegerField(required=False)
+    last_name = serializers.CharField(required=False, allow_blank=True, max_length=255)
+    first_name = serializers.CharField(required=False, allow_blank=True, max_length=255)
+    username = serializers.CharField(required=False, allow_blank=True, max_length=255)
+    phone = serializers.CharField(required=False, allow_blank=True, max_length=20)
+
+    def validate_telegram_id(self, value: int):
+        # kamida 5 xonali bo‘lsin
+        if value is None:
+            return value
+        if value < 10000:
+            raise serializers.ValidationError("telegram_id kamida 5 xonali bo‘lishi kerak.")
+        # DB’da bor bo‘lsa 400 qaytarish
+        if GuestProfile.objects.filter(telegram_id=value).exists():
+            raise serializers.ValidationError("Bu telegram_id allaqachon mavjud.")
+        return value
+
+    def validate_phone(self, value: str):
+        if value in (None, ""):
+            return value
+        v = value.strip()
+        if not all(ch.isdigit() or ch == "+" for ch in v):
+            raise serializers.ValidationError("Phone faqat raqamlar va '+' dan iborat bo‘lsin.")
+        if len(v.replace("+", "")) < 7:
+            raise serializers.ValidationError("Phone juda qisqa.")
+        return v
+
+    def validate(self, attrs):
+        req = self.context.get("request")
+        if req and req.method == "POST":
+            if not attrs.get("telegram_id") and not attrs.get("phone"):
+                raise serializers.ValidationError("telegram_id yoki phone dan bittasini yuborish kerak.")
+        return attrs
+
+
+class GuestUpdateSerializer(serializers.Serializer):
+    telegram_id = serializers.IntegerField(required=False)
+    last_name = serializers.CharField(required=False, allow_blank=True, max_length=255)
+    first_name = serializers.CharField(required=False, allow_blank=True, max_length=255)
+    username = serializers.CharField(required=False, allow_blank=True, max_length=255)
+    phone = serializers.CharField(required=False, allow_blank=True, max_length=20)
+
+    def validate_telegram_id(self, value):
+        if value is None:
+            return value
+
+        # kamida 5 xonali
+        if value < 10000:
+            raise serializers.ValidationError("telegram_id kamida 5 xonali bo‘lishi kerak.")
+
+        qs = GuestProfile.objects.filter(telegram_id=value)
+
+        # 🔥 MUHIM: o‘zini tekshiruvdan chiqaramiz
+        if self.instance:
+            qs = qs.exclude(pk=self.instance.pk)
+
+        if qs.exists():
+            raise serializers.ValidationError("Bu telegram_id allaqachon mavjud.")
+
+        return value

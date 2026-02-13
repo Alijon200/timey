@@ -195,3 +195,10 @@ SPECTACULAR_SETTINGS = {
         {"url": "http://127.0.0.1:8000", "description": "Local"},
     ],
 }
+
+from datetime import timedelta
+
+SIMPLE_JWT = {
+    "ACCESS_TOKEN_LIFETIME": timedelta(minutes=30),
+    "REFRESH_TOKEN_LIFETIME": timedelta(days=7),
+}

@@ -156,12 +156,15 @@ class OTP(models.Model):
 class GuestProfile(models.Model):
     user = models.OneToOneField(settings.AUTH_USER_MODEL, on_delete=models.CASCADE, related_name="guest_profile")
 
-    device_id = models.CharField(max_length=128, unique=True)
-    platform = models.CharField(max_length=20)  # android|ios|web
-    name = models.CharField(max_length=100, blank=True)
-    city = models.CharField(max_length=100, blank=True)
+    telegram_id = models.CharField(max_length=255, null=True, blank=True)
+    last_name = models.CharField(max_length=255, null=True, blank=True)
+    first_name = models.CharField(max_length=255, null=True, blank=True)
+    username = models.CharField(max_length=255, null=True, blank=True)
+    phone = models.CharField(max_length=20, null=True, blank=True)
 
     created_at = models.DateTimeField(auto_now_add=True)
 
     def __str__(self):
-        return f"guest:{self.device_id} -> user:{self.user_id}"
+        return f"GuestProfile for {self.user.username}"
+    
+
